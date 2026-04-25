@@ -11,7 +11,7 @@ namespace SuperNewRoles.Roles.Crewmate;
 internal class ElectionCommissioner : RoleBase<ElectionCommissioner>
 {
     public override RoleId Role => RoleId.ElectionCommissioner;
-    public override Color32 RoleColor => new(100, 200, 200, byte.MaxValue);
+    public override Color32 RoleColor => new(127, 127, 127, byte.MaxValue);
     public override List<Func<AbilityBase>> Abilities { get; } =
         [
                 () => new KnowVoteAbility(() => !ElectionCommissionerSeeVote)
