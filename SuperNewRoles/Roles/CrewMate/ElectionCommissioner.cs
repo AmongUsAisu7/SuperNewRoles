@@ -27,7 +27,7 @@ internal class ElectionCommissioner : RoleBase<ElectionCommissioner>
     public override RoleOptionMenuType OptionTeam => RoleOptionMenuType.Crewmate;
 
     // 保存されるオプション
-    /*[CustomOptionBool("ElectionCommissionerSeeVote", true)]
+    [CustomOptionBool("ElectionCommissionerSeeVote", true)]
     public static bool ElectionCommissionerSeeVote;
 
 
