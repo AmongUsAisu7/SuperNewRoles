@@ -14,6 +14,7 @@ public class JackalAbility : AbilityBase
     public CustomSidekickButtonAbility SidekickAbility { get; private set; }
     public KnowOtherAbility KnowJackalAbility { get; private set; }
     public ImpostorVisionAbility ImpostorVisionAbility { get; private set; }
+    private PlayerArrowsAbility _playerArrowsAbility;
     // 忘却者などで通報した時に状況がリセットされることへの対策
     public bool CreatedSidekick { get; private set; }
 
@@ -63,12 +64,14 @@ public class JackalAbility : AbilityBase
             () => JackData.IsImpostorVision
         );
 
+
         AbilityParentAbility parentAbility = new(this);
         Player.AttachAbility(KillAbility, parentAbility);
         Player.AttachAbility(VentAbility, parentAbility);
         Player.AttachAbility(SidekickAbility, parentAbility);
         Player.AttachAbility(KnowJackalAbility, parentAbility);
         Player.AttachAbility(ImpostorVisionAbility, parentAbility);
+        Player.AttachAbility(_playerArrowsAbility, new AbilityParentAbility(this));
     }
 
     [CustomRPC]
