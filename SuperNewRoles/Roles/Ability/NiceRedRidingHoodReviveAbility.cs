@@ -14,11 +14,9 @@ namespace SuperNewRoles.Roles.Ability;
 
 public class NiceRedRidingHoodReviveAbility : AbilityBase, IAbilityCount
 {
-    // イベントリスナー
     private EventListener<MurderEventData> _murderEventListener;
-    private EventListener<WrapUpEventData> _wrapUpEventListener;
+    private EventListener<ExileEventData> _exileEventListener; // 追放イベントに変更
 
-    // 内部状態
     public ExPlayerControl Killer { get; set; }
     public bool IsRevivable { get; set; }
     public int RemainingReviveCount { get; set; }
@@ -31,7 +29,6 @@ public class NiceRedRidingHoodReviveAbility : AbilityBase, IAbilityCount
         NiceRedRidingHoodIsKillerDeathRevive = niceRedRidingHoodIsKillerDeathRevive;
     }
 
-    // IAbilityCount実装
     public int MaxCount => NiceRedRidingHoodCount;
 
     public override void AttachToAlls()
@@ -39,54 +36,58 @@ public class NiceRedRidingHoodReviveAbility : AbilityBase, IAbilityCount
         base.AttachToAlls();
         RemainingReviveCount = NiceRedRidingHoodCount;
 
-        // イベントリスナーの登録
         _murderEventListener = MurderEvent.Instance.AddListener(OnMurderEvent);
-        _wrapUpEventListener = WrapUpEvent.Instance.AddListener(OnWrapUpEvent);
+        
+        // 誰かが追放された瞬間に発火するイベントを監視
+        _exileEventListener = ExileEvent.Instance.AddListener(OnExileEvent);
     }
 
     public override void DetachToAlls()
     {
         _murderEventListener?.RemoveListener();
-        _wrapUpEventListener?.RemoveListener();
+        _exileEventListener?.RemoveListener();
         base.DetachToAlls();
     }
 
     private void OnMurderEvent(MurderEventData data)
     {
-        // 自分が殺された場合、キラーを記録
+        // 自分が殺されたら、そのターンのキラーを記録して復活待機状態にする
         if (data.target == Player && data.killer != Player && RemainingReviveCount > 0)
         {
             Killer = data.killer;
             IsRevivable = true;
-            Logger.Info($"ナイス赤ずきん {Player.Player.name} がキラー {Killer.Player.name} に殺されました", "NiceRedRidingHood");
+            Logger.Info($"[赤ずきん] 死亡。キラー({Killer.Player.Data.PlayerName})をロックしました。", "NiceRedRidingHood");
         }
     }
 
-    private void OnWrapUpEvent(WrapUpEventData data)
+    private void OnExileEvent(ExileEventData data)
     {
-        if (!IsRevivable || Player.IsAlive() || Killer == null) return;
-        // 追放者がキラーの場合、復活判定
-        if (data.exiled != null && data.exiled == Killer)
+        // 自分が復活可能状態で、キラーが記録されている場合のみ進む
+        if (!IsRevivable || Killer == null) return;
+
+        // 今まさに追放されたプレイヤー（data.player）が、自分を殺したキラーだった場合
+        if (data.player == Killer)
         {
-            Logger.Info($"復活判定(キル者追放) : 可", "NiceRedRidingHood");
+            Logger.Info($"[赤ずきん] キラーが追放されました。復活処理を実行します。", "NiceRedRidingHood");
             Revive();
         }
-        else if (NiceRedRidingHoodIsKillerDeathRevive && Killer.IsDead())
+        else
         {
-            Logger.Info($"復活判定(キル者死亡) : 可", "NiceRedRidingHood");
-            Revive();
+            // キラー以外の人が追放された＝会議を跨ぐことになるため、
+            // 「仕様通り」ここで復活権利（フラグ）を消滅させ、次のターンでは復活できないようにする
+            IsRevivable = false;
+            Killer = null;
+            Logger.Info($"[赤ずきん] キラー以外が追放されたため、このターンの復活権利は消滅しました。", "NiceRedRidingHood");
         }
     }
 
     [CustomRPC]
-    private void Revive()
+    public void Revive()
     {
         if (!IsRevivable || RemainingReviveCount <= 0) return;
 
         Player.Player.Revive();
         RoleManager.Instance.SetRole(Player, RoleTypes.Crewmate);
-
-        // FinalStatusを更新
         FinalStatusManager.SetFinalStatus(Player, FinalStatus.Alive);
 
         RemainingReviveCount--;
@@ -94,32 +95,6 @@ public class NiceRedRidingHoodReviveAbility : AbilityBase, IAbilityCount
         Killer = null;
         Player.Data.IsDead = false;
 
-        Logger.Info($"復活完了 残り復活回数: {RemainingReviveCount}", "NiceRedRidingHood");
-    }
-}
-
-// 幽霊の役職表示とHaunt能力の制御
-public class NiceRedRidingHoodGhostAbility : AbilityBase
-{
-    private NiceRedRidingHoodReviveAbility _reviveAbility;
-    private DisibleHauntAbility _disableHauntAbility;
-    private HideRoleOnGhostAbility _hideRoleOnGhostAbility;
-
-    public override void AttachToAlls()
-    {
-        base.AttachToAlls();
-
-        // 復活能力への参照を取得
-        _reviveAbility = Player.GetAbility<NiceRedRidingHoodReviveAbility>();
-
-        if (_reviveAbility != null)
-        {
-            // 復活可能な場合は役職表示とHaunt能力を無効化
-            _disableHauntAbility = new DisibleHauntAbility(() => _reviveAbility.RemainingReviveCount > 0 && _reviveAbility.Killer != Player);
-            _hideRoleOnGhostAbility = new HideRoleOnGhostAbility((player) => _reviveAbility.RemainingReviveCount > 0 && _reviveAbility.Killer != Player);
-
-            Player.AttachAbility(_disableHauntAbility, new AbilityParentAbility(this));
-            Player.AttachAbility(_hideRoleOnGhostAbility, new AbilityParentAbility(this));
-        }
+        Logger.Info($"[赤ずきん] 復活成功。残り回数: {RemainingReviveCount}", "NiceRedRidingHood");
     }
 }
